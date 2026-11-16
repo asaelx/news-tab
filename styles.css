@@ -20,3 +20,4 @@ dialog{border-radius:var(--radius-panel) 0 0 var(--radius-panel);background:var(
 @media(forced-colors:active){.shell>header,dialog,.pills,.card{background:Canvas;border:1px solid CanvasText;backdrop-filter:none}.card-copy{background:Canvas;color:CanvasText}.shade{display:none}}
 /* Keep the settings sheet entirely out of hit testing while closed. */
 dialog:not([open]){display:none!important}
+.topic-switch{position:relative;width:44px;height:27px;border:1px solid var(--line);border-radius:999px;background:var(--muted);padding:0;flex:none;transition:background .18s ease}.topic-switch[aria-checked=true]{background:var(--accent);border-color:var(--accent)}.switch-thumb{display:block;width:19px;height:19px;margin:3px;border-radius:50%;background:var(--paper);box-shadow:0 1px 3px #0004;transition:transform .18s ease}.topic-switch[aria-checked=true] .switch-thumb{transform:translateX(17px)}
