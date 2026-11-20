@@ -35,10 +35,10 @@ const $=s=>document.querySelector(s);
 function save(){localStorage.setItem(key,JSON.stringify(settings));}
 function theme(){document.documentElement.dataset.theme=settings.theme==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):settings.theme;}
 function dateText(){return new Intl.DateTimeFormat('en',{weekday:'long',month:'long',day:'numeric'}).format(new Date());}
-function card(a,i){return `<a class="card ${i===0?'hero':''}" href="${escapeHTML(a.url)}" data-story-url="${escapeHTML(a.url)}"><div class="photo" style="background-image:url('${escapeHTML(a.image||'')}')"></div><div class="shade"></div><div class="card-copy"><div class="eyebrow">${escapeHTML(a.topic)} <span>·</span> ${escapeHTML(a.source)}</div><h3>${escapeHTML(a.title)}</h3><div class="card-date">${escapeHTML(a.date)}</div></div></a>`}
+function card(a,i){return `<a class="card ${i===0?'hero':''} ${a.image?'':'no-image'}" href="${escapeHTML(a.url)}" data-story-url="${escapeHTML(a.url)}"><div class="photo" style="background-image:url('${escapeHTML(a.image||'')}')"></div><div class="shade"></div><div class="card-copy"><div class="eyebrow">${escapeHTML(a.topic)} <span>·</span> ${escapeHTML(a.source)}</div><h3>${escapeHTML(a.title)}</h3><div class="card-date">${escapeHTML(a.date)}</div></div></a>`}
 function escapeHTML(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function filtered(){const seen=new Set();return [...restoredMap.values(),...articles].filter(a=>{const id=storyId(a.url);if(seen.has(id)||readMap.has(id)||!settings.topics[a.topic])return false;seen.add(id);return true;});}
-function featuredStories(){return filtered().slice(0,3);}
+function featuredStories(){const all=filtered(),withImages=all.filter(a=>a.image);const top=withImages.slice(0,3);if(top.length<3)top.push(...all.filter(a=>!a.image).slice(0,3-top.length));return top;}
 function remainingStories(){const topIds=new Set(featuredStories().map(a=>storyId(a.url)));return filtered().filter(a=>!topIds.has(storyId(a.url)));}
 function featuredQuip(){
  const lead=featuredStories()[0];
