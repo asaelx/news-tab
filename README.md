@@ -29,6 +29,8 @@ The interface uses a restrained glass material for the sticky header and setting
 
 ## Updating the unpacked extension
 
-After editing files, click **Reload** for Briefly in `brave://extensions`, then open a new tab. The manifest version is `0.1.6` for the current build.
+After editing files, click **Reload** for Briefly in `brave://extensions`, then open a new tab. The manifest version is `0.1.7` for the current build.
 
 Location-based weather now resolves the current GPS position to a city name using BigDataCloud's free client-side reverse-geocoding endpoint. This sends the coordinates to BigDataCloud when **Use current location** is selected; its free service uses coordinate and IP signals to improve its geolocation data. You can enter a city manually instead. Existing generic location labels are cleared and retried when location permission is already granted.
+
+The header tagline is “Fresh takes, no filler.” The featured kicker uses a short, locally generated quip based on the lead headline; it does not send article text to an AI service.
