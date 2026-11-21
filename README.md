@@ -14,12 +14,11 @@ The initial preview uses clearly labeled sample stories. In an installed extensi
 ## Current feeds
 
 - The Verge: `https://www.theverge.com/rss/index.xml`
-- TechCrunch: `https://techcrunch.com/feed/`
 - 9to5Mac: `https://9to5mac.com/feed/`
 - MacRumors: `https://www.macrumors.com/macrumors.xml`
 - Ars Technica: `https://feeds.arstechnica.com/arstechnica/index`
 
-The endpoints returned XML/RSS content types in web checks. Their article image quality, feed permissions, and runtime fetch behavior still need checking in Brave. TechCrunch's RSS terms require attribution and links to the original stories, which the cards provide.
+The endpoints returned XML/RSS content types in web checks. Their article image quality, feed permissions, and runtime fetch behavior still need checking in Brave.
 
 Weather uses Open-Meteo. Location is requested only when you click **Use current location**. You can enter a city instead. Preferences and cached articles remain in browser local storage.
 
@@ -29,12 +28,10 @@ The interface uses a restrained glass material for the sticky header and setting
 
 ## Updating the unpacked extension
 
-After editing files, click **Reload** for Briefly in `brave://extensions`, then open a new tab. The manifest version is `0.1.11` for the current build.
+After editing files, click **Reload** for Briefly in `brave://extensions`, then open a new tab. The manifest version is `0.1.12` for the current build.
 
 Location-based weather now resolves the current GPS position to a city name using BigDataCloud's free client-side reverse-geocoding endpoint. This sends the coordinates to BigDataCloud when **Use current location** is selected; its free service uses coordinate and IP signals to improve its geolocation data. You can enter a city manually instead. Existing generic location labels are cleared and retried when location permission is already granted.
 
 The header tagline is “Fresh takes, no filler.” The featured kicker uses a short, locally generated quip based on the lead headline; it does not send article text to an AI service.
 
 Opened story links replace the current tab, are saved to the local Read tab, and are hidden from Latest. Use **Mark unread** in Read to return a story to Latest, even if it has since fallen out of the current RSS feed. Read history and restored stories are stored in browser local storage.
-
-TechCrunch currently omits images from its RSS items. Its stories appear as text-led cards below the featured row when image-bearing stories are available; featured stories prioritize feed-provided images.
