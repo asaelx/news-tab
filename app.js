@@ -136,20 +136,63 @@ function escapeHTML(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;',
 function filtered(){const seen=new Set();return [...restoredMap.values(),...articles].filter(a=>{const id=storyId(a.url);if(seen.has(id)||readMap.has(id)||dismissedMap.has(id)||!activeSources.has(a.source)||!isRecentStory(a)||!settings.topics[a.topic])return false;seen.add(id);return true;});}
 function featuredStories(){const all=filtered(),withImages=all.filter(a=>a.image);const top=withImages.slice(0,3);if(top.length<3)top.push(...all.filter(a=>!a.image).slice(0,3-top.length));return top;}
 function remainingStories(){const topIds=new Set(featuredStories().map(a=>storyId(a.url)));return filtered().filter(a=>!topIds.has(storyId(a.url)));}
-function featuredQuip(){
- const lead=featuredStories()[0];
- if(!lead)return '“The news is taking a day off. Your subjects can bring it back.”';
- const title=lead.title.toLowerCase();
- if(title.includes('serena williams'))return '“Serena’s latest serve comes with a term sheet.”';
- if(title.includes('james bond'))return '“The name’s Bond. The casting department has entered the chat.”';
- if(title.includes('chatgpt')&&title.includes('health'))return '“Your Mac may soon ask how you’re feeling.”';
- if(title.includes('iphone'))return '“The iPhone rumor mill has clocked in again.”';
- if(title.includes('google maps'))return '“Google Maps wants to plan the trip and call the shots.”';
- if(title.includes('ai chip'))return '“Even the chips are getting travel restrictions.”';
- const words=lead.title.replace(/[.!?]+$/,'').split(/\s+/);
- const short=words.slice(0,9).join(' ')+(words.length>9?'…':'');
- return `“Plot twist: ${short}.”`;
+const editorialCacheKey = 'briefly-editorial-line';
+const editorialRequests = new Map();
+
+function featuredQuip() {
+  return featuredStories().length ? '' : 'No featured stories right now.';
 }
+
+function storySummary(item) {
+  const html = item.querySelector('summary, description')?.textContent;
+  if (!html) return '';
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  template.content.querySelectorAll('script, style').forEach(node => node.remove());
+  return (template.content.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 2400);
+}
+
+async function showEditorialLine() {
+  const lead = featuredStories()[0];
+  const runtime = globalThis.chrome?.runtime;
+  if (!lead?.summary || !runtime?.sendNativeMessage) return;
+
+  const key = JSON.stringify([lead.url, lead.title, lead.summary]);
+  const show = text => {
+    const current = featuredStories()[0];
+    if (current !== lead) return;
+    const label = $('#lead-quip');
+    if (label) label.textContent = text;
+  };
+
+  const cached = JSON.parse(localStorage.getItem(editorialCacheKey) || 'null');
+  if (cached?.timestamp < Date.now() - storyRetentionMs) localStorage.removeItem(editorialCacheKey);
+  else if (cached?.key === key) {
+    show(cached.text);
+    return;
+  }
+
+  if (!editorialRequests.has(key)) {
+    const request = runtime.sendNativeMessage('com.briefly.writer', {
+      title: lead.title.slice(0, 400),
+      summary: lead.summary,
+    }).then(reply => {
+      const text = typeof reply?.text === 'string' ? reply.text.trim() : '';
+      if (reply?.error) throw new Error(reply.error);
+      if (!text || text.length > 260 || !isRecentStory(lead)) return '';
+      localStorage.setItem(editorialCacheKey, JSON.stringify({ key, text, timestamp: lead.timestamp }));
+      return text;
+    }).catch(error => {
+      console.warn('Briefly Apple Intelligence:', error.message);
+      return '';
+    });
+    editorialRequests.set(key, request);
+  }
+
+  const text = await editorialRequests.get(key);
+  if (text) show(text);
+}
+
 function viewTabs() {
   const tabs = [
     ['latest', 'Latest', ''],
@@ -175,14 +218,14 @@ function dismissedMarkup() {
   </section>`;
 }
 
-function renderStories(){if(view!=='latest')return;const all=filtered(),top=featuredStories(),rest=remainingStories().slice(0,Math.max(0,visible-top.length));const featured=$('.featured'),feed=$('#feed');if(!featured||!feed)return;featured.innerHTML=top.map(latestCard).join('')||'<div class="empty">No unread stories in your selected subjects.</div>';feed.innerHTML=rest.map((a,i)=>latestCard(a,i+3)).join('');const quip=$('#lead-quip');if(quip)quip.textContent=featuredQuip();const count=$('.read-count');if(count)count.textContent=readMap.size;document.querySelectorAll('.pill').forEach(p=>p.classList.toggle('on',!!settings.topics[p.textContent]));if(observer){observer.disconnect();if(visible<all.length)observer.observe($('#sentinel'));}}
+function renderStories(){if(view!=='latest')return;const all=filtered(),top=featuredStories(),rest=remainingStories().slice(0,Math.max(0,visible-top.length));const featured=$('.featured'),feed=$('#feed');if(!featured||!feed)return;featured.innerHTML=top.map(latestCard).join('')||'<div class="empty">No unread stories in your selected subjects.</div>';feed.innerHTML=rest.map((a,i)=>latestCard(a,i+3)).join('');const quip=$('#lead-quip');if(quip)quip.textContent=featuredQuip();void showEditorialLine();const count=$('.read-count');if(count)count.textContent=readMap.size;document.querySelectorAll('.pill').forEach(p=>p.classList.toggle('on',!!settings.topics[p.textContent]));if(observer){observer.disconnect();if(visible<all.length)observer.observe($('#sentinel'));}}
 function render(){pruneExpiredStories();const dialogWasOpen=$('#settings-dialog')?.open??false;theme();$('#app').innerHTML=`<div class="shell"><header><div class="brand-group"><a class="brand" href="#">briefly<span>.</span></a><span class="brand-tagline">Fresh takes, no filler.</span></div><div class="header-right"><span class="today">${dateText()}</span><span class="divider"></span><button id="weather" class="weather" title="Weather and location">${settings.city?escapeHTML(settings.city):'Set location'} <span id="weather-value">${weatherText()||(!settings.city?'☀️':'')}</span></button><button id="settings-btn" class="icon-btn" aria-label="Open settings">⚙</button></div></header><main>${view==='read'?readMarkup():view==='not-interested'?dismissedMarkup():latestMarkup()}<footer>Curated for your new tab <span>·</span> Stories open at their original source</footer></main></div><dialog id="settings-dialog"><div class="modal-head"><div><span class="section-index">MAKE IT YOURS</span><h2>Settings</h2></div><button type="button" id="close" class="icon-btn" aria-label="Close settings">×</button></div><div class="setting-group"><label>Appearance</label><div class="segment">${['light','dark','system'].map(t=>`<button data-theme="${t}" class="${settings.theme===t?'active':''}">${t}</button>`).join('')}</div></div><div class="setting-group"><label>Subjects in your feed</label>${topics.map(t=>`<div class="toggle-row"><span>${t}</span><button type="button" class="topic-switch" data-topic="${t}" role="switch" aria-label="Show ${t} news" aria-checked="${settings.topics[t]}"><span class="switch-thumb"></span></button></div>`).join('')}</div><div class="setting-group"><label>Weather location</label><p class="hint">Use your current location or choose a city.</p><button id="use-location" class="outline">Use current location</button><div class="city-input"><input id="city" placeholder="Enter a city" value="${escapeHTML(settings.city)}"><button id="save-city">Save</button></div><p id="location-note" class="hint"></p></div><div class="modal-foot">Preferences are saved on this browser.</div></dialog>`;
 const dialog=$('#settings-dialog');if(dialogWasOpen)dialog.showModal();$('#settings-btn').onclick=()=>dialog.showModal();$('#weather').onclick=()=>dialog.showModal();$('#close').onclick=()=>dialog.close();dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
 document.querySelectorAll('[data-theme]').forEach(b=>b.onclick=()=>{settings.theme=b.dataset.theme;save();render()});
 document.querySelectorAll('[data-topic]').forEach(b=>b.onclick=()=>{const topic=b.dataset.topic;settings.topics[topic]=!settings.topics[topic];b.setAttribute('aria-checked',String(settings.topics[topic]));save();renderStories()});
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;render();$('[data-view].active')?.focus({preventScroll:true});window.scrollTo({top:0});});
 $('#use-location').onclick=useLocation;$('#save-city').onclick=saveCity;
-observer?.disconnect();if(view==='latest'){observer=new IntersectionObserver(es=>{if(es[0].isIntersecting&&visible<filtered().length){visible+=6;renderStories();}}, {rootMargin:'500px'});observer.observe($('#sentinel'));}
+observer?.disconnect();if(view==='latest'){observer=new IntersectionObserver(es=>{if(es[0].isIntersecting&&visible<filtered().length){visible+=6;renderStories();}}, {rootMargin:'500px'});observer.observe($('#sentinel'));void showEditorialLine();}
 }
 
 async function useLocation(){const note=$('#location-note');if(note)note.textContent='Requesting location…';navigator.geolocation.getCurrentPosition(async p=>{const lat=p.coords.latitude,lon=p.coords.longitude;settings.lat=lat;settings.lon=lon;settings.locationAsked=true;settings.city='';save();await loadWeather(lat,lon);try{const r=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&localityLanguage=en`);if(!r.ok)throw Error('City lookup failed');const place=await r.json();const city=(place.city||place.locality||'').trim();if(!city)throw Error('No city returned');settings.city=city;save();render();const currentNote=$('#location-note');if(currentNote)currentNote.textContent=`Using ${city}.`;}catch{if(note?.isConnected)note.textContent='Could not identify your city. Enter it below.';}},()=>{if(note)note.textContent='Location unavailable. Enter a city below.';},{timeout:10000});}
@@ -191,7 +234,7 @@ function weatherEmoji(code){if(code===0)return'☀️';if(code<=3)return'⛅';if
 async function loadWeather(lat,lon){try{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`);if(!r.ok)throw Error('Weather unavailable');const d=await r.json();const c=d.current;if(!c)return;const value=`${Math.round(c.temperature_2m)} °C ${weatherEmoji(c.weather_code)}`;weatherCache={lat,lon,text:value,time:Date.now()};localStorage.setItem(weatherKey,JSON.stringify(weatherCache));const el=$('#weather-value');if(el)el.textContent=value;}catch{}}
 function refreshWeather(){if(settings.lat==null||settings.lon==null)return;if(weatherCache&&weatherCache.lat===settings.lat&&weatherCache.lon===settings.lon&&Date.now()-weatherCache.time<30*60*1000)return;loadWeather(settings.lat,settings.lon);}
 function imageFor(item){const media=item.getElementsByTagName('media:content')[0]||item.getElementsByTagName('media:thumbnail')[0]||item.getElementsByTagName('enclosure')[0];const mediaUrl=media?.getAttribute('url');if(mediaUrl?.match(/\.(jpg|jpeg|png|webp)(\?|$)/i))return mediaUrl;const html=item.querySelector('description')?.textContent||item.querySelector('content')?.textContent||'';const img=html.match(/<img[^>]+src=["']([^"']+)/i)?.[1];return img||'';}
-async function loadFeeds(){if(!globalThis.chrome?.runtime?.id)return;const cached=JSON.parse(localStorage.getItem(feedCacheKey)||'null');if(cached?.items?.length){articles=cached.items.filter(article => activeSources.has(article.source));mode='live';render();if(Date.now()-cached.time<15*60*1000)return;}const results=await Promise.allSettled(sources.map(async s=>{const r=await fetch(s.url);if(!r.ok)throw Error(r.status);const xml=new DOMParser().parseFromString(await r.text(),'application/xml');return [...xml.querySelectorAll('item, entry')].slice(0,15).map(item=>{const title=item.querySelector('title')?.textContent?.trim();const link=item.querySelector('link')?.getAttribute('href')||item.querySelector('link')?.textContent?.trim();return{title,url:link,topic:s.topic,source:s.name,timestamp:publicationTimestamp(item),image:imageFor(item)}}).filter(a=>a.title&&a.url&&isRecentStory(a))}));const items=results.flatMap(r=>r.status==='fulfilled'?r.value:[]);if(items.length||results.some(result=>result.status==='fulfilled')){const seen=new Set();articles=items.sort((a,b)=>b.timestamp-a.timestamp).filter(a=>{const key=a.url.replace(/\?.*$/,'');if(seen.has(key))return false;seen.add(key);return true});mode='live';localStorage.setItem(feedCacheKey,JSON.stringify({time:Date.now(),items:articles}));render();}}
+async function loadFeeds(){if(!globalThis.chrome?.runtime?.id)return;const cached=JSON.parse(localStorage.getItem(feedCacheKey)||'null');if(cached?.items?.length){articles=cached.items.filter(article => activeSources.has(article.source));mode='live';render();if(Date.now()-cached.time<15*60*1000&&cached.summaryVersion===1)return;}const results=await Promise.allSettled(sources.map(async s=>{const r=await fetch(s.url);if(!r.ok)throw Error(r.status);const xml=new DOMParser().parseFromString(await r.text(),'application/xml');return [...xml.querySelectorAll('item, entry')].slice(0,15).map(item=>{const title=item.querySelector('title')?.textContent?.trim();const link=item.querySelector('link')?.getAttribute('href')||item.querySelector('link')?.textContent?.trim();return{title,url:link,topic:s.topic,source:s.name,timestamp:publicationTimestamp(item),summary:storySummary(item),image:imageFor(item)}}).filter(a=>a.title&&a.url&&isRecentStory(a))}));const items=results.flatMap(r=>r.status==='fulfilled'?r.value:[]);if(items.length||results.some(result=>result.status==='fulfilled')){const seen=new Set();articles=items.sort((a,b)=>b.timestamp-a.timestamp).filter(a=>{const key=a.url.replace(/\?.*$/,'');if(seen.has(key))return false;seen.add(key);return true});mode='live';localStorage.setItem(feedCacheKey,JSON.stringify({time:Date.now(),summaryVersion:1,items:articles}));render();}}
 document.addEventListener('click', event => {
   const restore = event.target.closest('[data-restore-dismissed]');
   if (restore) restoreDismissedStory(restore.dataset.restoreDismissed);

@@ -28,10 +28,25 @@ The interface uses a restrained glass material for the sticky header and setting
 
 ## Updating the unpacked extension
 
-After editing files, click **Reload** for Briefly in `brave://extensions`, then open a new tab. The manifest version is `0.1.12` for the current build.
+After editing files, click **Reload** for Briefly in `brave://extensions`, then open a new tab. The manifest version is `0.1.13` for the current build.
 
 Location-based weather now resolves the current GPS position to a city name using BigDataCloud's free client-side reverse-geocoding endpoint. This sends the coordinates to BigDataCloud when **Use current location** is selected; its free service uses coordinate and IP signals to improve its geolocation data. You can enter a city manually instead. Existing generic location labels are cleared and retried when location permission is already granted.
 
-The header tagline is “Fresh takes, no filler.” The featured kicker uses a short, locally generated quip based on the lead headline; it does not send article text to an AI service.
+The header tagline is “Fresh takes, no filler.” The featured line can use Apple Intelligence on your Mac. See setup below.
 
 Opened story links replace the current tab, are saved to the local Read tab, and are hidden from Latest. Use **Mark unread** in Read to return a story to Latest, even if it has since fallen out of the current RSS feed. Read history and restored stories are stored in browser local storage.
+
+## Apple Intelligence in Brave
+
+On an Apple silicon Mac with macOS 26 or later, enable Apple Intelligence.
+With Xcode command line tools installed, copy Briefly’s ID from `brave://extensions`
+and run `bash native/install.sh <extension-id>` from this checkout. Reload Briefly
+and open a new tab. Only that extension ID can call the installed helper.
+
+If Brave reports that the native messaging host was not found, rerun the installer
+with `--shared-chromium`. This also registers the helper in the Chrome discovery
+folder used by some Brave builds. The registration still allows only Briefly’s ID.
+
+The helper uses Apple’s on-device model to write a short take from the lead
+story’s headline and RSS summary. Serious stories get a factual line. If the
+model is unavailable or a feed omits the summary, the editorial line is hidden.
